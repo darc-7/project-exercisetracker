@@ -5,7 +5,7 @@ require('dotenv').config()
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 
-mongoose.connect(process.env.MONGO_URI, {
+mongoose.connect('mongodb+srv://admin:admin@exercise-tracker.h5wpbcm.mongodb.net/exercise-tracker?retryWrites=true&w=majority', {
   useUnifiedTopology: true,
   useNewUrlParser: true,
 });
@@ -47,9 +47,36 @@ app.post("/api/users", (req, res) => {
 });
 
 app.post("/api/users/:id/exercises", (req, res) => {
-  const id = req.params.id;
-  const {description, duration, date} = req.body;
-  User.findById(id, (err, userData) => {
+  let id = req.params.id;
+  let {description, duration, date} = req.body;
+
+  const foundUser = User.findById(id);
+  if(!foundUser){
+    res.send("NO USER");
+  }
+
+  if(!date){
+    date = new Date().toDateString();
+  }else{
+    date = new Date(date).toDateString();
+  }
+
+  Exercise.create({
+    userId: id,
+    description,
+    duration,
+    date
+  })
+
+  res.send({
+    username: foundUser.username,
+    description,
+    duration,
+    date,
+    _id: id
+  });
+});
+  /*User.findById(id, (err, userData) => {
     if(err || !userData) {
       res.send("NO USER");
     }else{
@@ -75,15 +102,18 @@ app.post("/api/users/:id/exercises", (req, res) => {
       });
     }
   });
-});
+});*/
 
 app.get("/api/users/:id/logs", (req, res) =>{ 
-  const { from, to, limit } = req.query;
+  let { from, to, limit } = req.query;
   const {id} = req.params;
   User.findById(id, (err, userData) => {
     if(err || !userData) {
       res.send("NO USER");
     }else{
+      let filter = {
+        userId: id
+      }
       let dateObj = {}
       if(from){
         dateObj["$gte"] = new Date(from);
@@ -91,16 +121,30 @@ app.get("/api/users/:id/logs", (req, res) =>{
       if(to){
         dateObj["$lte"] = new Date(to);
       }
-      let filter = {
-        userId: id
-      }
       if(from || to ){
         filter.date = dateObj;
       }
-      let nonNullLimit = limit;
-      Exercise.find(filter).limit(+nonNullLimit).exec((err, data) => {
+      if(!limit){
+        limit = 100;
+      }
+     
+     /*let exercises = Exercise.find(id);
+     exercises = exercises.map((exercise)=>{
+       return{
+         description: exercise.description,
+         duration: exercise.duration,
+         date: exercise.date
+       };
+     });
+     
+     res.json({
+       username: userData.username,
+       count: exercises.length,
+       _id: id,
+       log: exercises
+     });*/ Exercise.find(filter).limit(limit).exec((err, data) => {
         if(err || !data){
-          res.json([])
+          res.send('NO DATA');
         }else{
           const count = data.length;
           const rawLog = data;
